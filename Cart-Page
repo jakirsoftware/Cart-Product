@@ -1,0 +1,284 @@
+//https://chatgpt.com/c/6794c18a-72c8-8003-8a7d-d33df4251bed
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Shopping Cart</title>
+    <script>
+      let cart = [];
+      let contacts = [];
+
+      // Fetch products and contacts from Apps Script
+      function fetchProducts() {
+        google.script.run.withSuccessHandler(displayProducts).getProducts();
+      }
+
+      function fetchContacts() {
+        google.script.run.withSuccessHandler(displayContacts).getContacts();
+      }
+
+      // Display products
+      function displayProducts(products) {
+        const productList = document.getElementById('productList');
+        productList.innerHTML = ''; // Clear product list before displaying
+        products.forEach((product, index) => {
+          const productDiv = document.createElement('div');
+          productDiv.classList.add('product');
+          productDiv.innerHTML = `
+            <img src="${product.imageUrl}" alt="${product.name}" width="100">
+            <p>${product.name}</p>
+            <p>$${product.price}</p>
+            <button onclick="addToCart(${index}, ${product.price}, '${product.name}')">Add to Cart</button>
+          `;
+          productList.appendChild(productDiv);
+        });
+      }
+
+      // Display contacts
+      function displayContacts(contactsList) {
+        contacts = contactsList;
+        const contactSelect = document.getElementById('contactSelect');
+        contactSelect.innerHTML = '<option value="">Select Contact</option>'; // Reset contact dropdown
+
+        contacts.forEach(contact => {
+          const option = document.createElement('option');
+          option.value = contact.id;
+          option.textContent = contact.name;
+          contactSelect.appendChild(option);
+        });
+      }
+
+      // Add to Cart function (checks if the product is already in the cart)
+      function addToCart(index, price, name) {
+        const existingProduct = cart.find(item => item.name === name);
+        
+        if (existingProduct) {
+          existingProduct.quantity += 1;
+        } else {
+          cart.push({ price, quantity: 1, name });
+        }
+        
+        updateCart();
+      }
+
+      // Update quantity in cart (increase or decrease)
+      function updateQuantity(index, action) {
+        if (action === 'increase') {
+          cart[index].quantity += 1;
+        } else if (action === 'decrease' && cart[index].quantity > 1) {
+          cart[index].quantity -= 1;
+        }
+        updateCart();
+      }
+
+      // Delete Cart Item
+      function deleteCartItem(index) {
+        cart.splice(index, 1);
+        updateCart();
+      }
+
+      // Update Cart Display
+      function updateCart() {
+        const cartTable = document.getElementById('cartTable');
+        cartTable.innerHTML = ''; // Clear cart table before updating
+        let total = 0;
+        cart.forEach((item, index) => {
+          total += item.price * item.quantity;
+          const row = cartTable.insertRow();
+          row.insertCell(0).innerText = item.name;
+          const quantityCell = row.insertCell(1);
+          quantityCell.innerHTML = `
+            <button onclick="updateQuantity(${index}, 'decrease')">-</button>
+            ${item.quantity}
+            <button onclick="updateQuantity(${index}, 'increase')">+</button>
+          `;
+          row.insertCell(2).innerText = `$${item.price * item.quantity}`;
+          const deleteCell = row.insertCell(3);
+          deleteCell.innerHTML = `<button onclick="deleteCartItem(${index})">Delete</button>`;
+        });
+        document.getElementById('total').innerText = `Total: $${total}`;
+      }
+
+      // Submit Cart with selected contact
+      function submitCart() {
+        const contactSelect = document.getElementById('contactSelect');
+        const selectedContactId = contactSelect.value;
+        
+        if (!selectedContactId) {
+          alert('Please select a contact!');
+          return;
+        }
+
+        google.script.run.withSuccessHandler(function(response) {
+          alert(`Cart submitted! Invoice Number: ${response.invoiceNumber}\nTotal: $${response.total}`);
+          
+          // Clear cart data after submission
+          clearCart();
+        }).submitCart({ cartItems: cart }, selectedContactId);
+      }
+
+      // Clear Cart Data
+      function clearCart() {
+        // Clear the cart array and reset the cart display
+        cart = [];
+        updateCart(); // Reset cart display and total
+
+        // Reset the contact dropdown
+        const contactSelect = document.getElementById('contactSelect');
+        contactSelect.selectedIndex = 0;
+
+        // Optionally, clear any other fields (e.g., search box)
+        document.getElementById('searchBox').value = '';
+      }
+
+      // Search for products by name
+      function searchProducts() {
+        const query = document.getElementById('searchBox').value.toLowerCase();
+        const allProducts = document.getElementById('productList').getElementsByClassName('product');
+        for (let product of allProducts) {
+          const productName = product.querySelector('p').innerText.toLowerCase();
+          if (productName.includes(query)) {
+            product.style.display = '';
+          } else {
+            product.style.display = 'none';
+          }
+        }
+      }
+
+      // On page load
+      window.onload = function() {
+        fetchProducts();
+        fetchContacts();
+      };
+    </script>
+  </head>
+  <body>
+    <h1>Shopping Cart</h1>
+
+    <input type="text" id="searchBox" oninput="searchProducts()" placeholder="Search products...">
+    
+    <div id="productList"></div>
+
+    <h2>Your Cart</h2>
+    <table id="cartTable">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Quantity</th>
+          <th>Price</th>
+          <th>Delete</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <p id="total">Total: $0</p>
+
+    <label for="contactSelect">Select Contact:</label>
+    <select id="contactSelect">
+      <option value="">Select Contact</option>
+    </select>
+
+    <button onclick="submitCart()">Submit Cart</button>
+  </body>
+</html>
+-----------------------------------------------
+// Do this if you're submitting the cart via an HTML form
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('CartH');
+}
+
+function doPost(e) {
+  const cartItems = JSON.parse(e.postData.contents).cartItems;
+  const total = submitCart(cartItems);
+  return ContentService.createTextOutput(JSON.stringify({ total }));
+}
+// Fetch products from Sheet1 and return them as JSON
+function getProducts() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Sheet1');
+  const data = sheet.getDataRange().getValues();
+  const products = [];
+  for (let i = 1; i < data.length; i++) {
+    products.push({
+      name: data[i][0],
+      imageUrl: data[i][1],
+      price: data[i][2]
+    });
+  }
+  return products;
+}
+
+
+// Fetch products from Sheet1 and return them as JSON
+function getProducts() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Sheet1');
+  const data = sheet.getDataRange().getValues();
+  const products = [];
+  for (let i = 1; i < data.length; i++) {
+    products.push({
+      name: data[i][0],
+      imageUrl: data[i][1],
+      price: data[i][2]
+    });
+  }
+  return products;
+}
+
+// Submit the cart and calculate total
+function submitCart(cartItems) {
+  let total = 0;
+  cartItems.forEach(item => {
+    total += item.price * item.quantity;
+  });
+  Logger.log('Total Cart Value: ' + total);
+  return total;
+}
+
+//------------------------
+// Get all contacts from the contacts sheet
+function getContacts() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('contacts');
+  const data = sheet.getDataRange().getValues();
+  const contacts = [];
+
+  for (let i = 1; i < data.length; i++) {
+    contacts.push({
+      id: data[i][0], // Assuming the ID is in the first column
+      name: data[i][1], // Assuming the name is in the second column
+    });
+  }
+
+  return contacts;
+}
+
+// Submit the cart and generate a unique invoice number
+function submitCart(cartData, selectedContactId) {
+  const cartItems = cartData.cartItems;
+  let total = 0;
+
+  // Calculate the total price of the cart
+  cartItems.forEach(item => {
+    total += item.price * item.quantity;
+  });
+
+  // Generate a unique invoice number
+  const invoiceNumber = 'INV-' + new Date().getTime() + '-' + Math.floor(Math.random() * 1000);
+
+  // Access the "orders" sheet
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('orders');
+  if (!sheet) {
+    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet('orders');
+    sheet.appendRow(['Invoice Number', 'Product Name', 'Quantity', 'Price', 'Total', 'Contact ID']);
+  }
+
+  // Save the cart data with invoice number to the sheet
+  cartItems.forEach(item => {
+    sheet.appendRow([invoiceNumber, item.name, item.quantity, item.price, item.price * item.quantity, selectedContactId]);
+  });
+
+  // Save the total amount to the sheet as well
+  sheet.appendRow([invoiceNumber, 'Total', '', '', total, selectedContactId]);
+
+  return {
+    invoiceNumber: invoiceNumber,
+    total: total
+  };
+}
