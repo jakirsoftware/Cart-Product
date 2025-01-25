@@ -1,3 +1,5 @@
+//https://chatgpt.com/c/6794ab8f-98c0-8003-b600-d6a49f090273
+
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index');
 }
