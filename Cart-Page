@@ -1,4 +1,5 @@
 //https://chatgpt.com/c/6794c18a-72c8-8003-8a7d-d33df4251bed
+
 <!DOCTYPE html>
 <html>
   <head>
@@ -277,7 +278,17 @@
           `;
           cartList.appendChild(cartItemDiv);
         });
+
+        // Update total
         document.getElementById('total').innerText = `Total: $${total}`;
+
+        // Show or hide contact selection and submit button based on total
+        const contactSection = document.getElementById('contactSection');
+        if (total > 0) {
+          contactSection.style.display = 'block'; // Show contact section and submit button
+        } else {
+          contactSection.style.display = 'none'; // Hide contact section and submit button
+        }
       }
 
       // Search for products by name
@@ -348,17 +359,18 @@
 
       <p id="total">Total: $0</p>
 
-      <label for="contactSelect">Select Contact:</label>
-      <select id="contactSelect">
-        <option value="">Select Contact</option>
-      </select>
+      <div id="contactSection" style="display: none;">
+        <label for="contactSelect">Select Contact:</label>
+        <select id="contactSelect">
+          <option value="">Select Contact</option>
+        </select>
 
-      <button onclick="submitCart()">Submit Cart</button>
+        <button onclick="submitCart()">Submit Cart</button>
+      </div>
     </div>
   </body>
 </html>
-
------------------------------------------------
+--------------------------------------------
 // Do this if you're submitting the cart via an HTML form
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('CartH');
